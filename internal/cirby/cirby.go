@@ -83,7 +83,7 @@ func Run(opts Options) error {
 		case "keep":
 			// AGENTS.md itself, nothing to do
 			if opts.Verbose {
-				fmt.Printf("  ✓ %s (already standard)\n", cfg.Path)
+				fmt.Printf("  [ok] %s (already standard)\n", cfg.Path)
 			}
 		}
 	}
@@ -96,7 +96,7 @@ func Run(opts Options) error {
 		existingHash := hashContent(existingAgentsMD)
 		newHash := hashContent(mergedContent)
 		if existingHash == newHash && len(toSymlink) == 0 {
-			fmt.Println("✓ Already in sync. Nothing to do.")
+			fmt.Println("[ok] Already in sync. Nothing to do.")
 			return nil
 		}
 	}
@@ -115,7 +115,7 @@ func Run(opts Options) error {
 		}
 
 		for _, cfg := range toSymlink {
-			fmt.Printf("  • Create symlink: %s → AGENTS.md\n", cfg.Path)
+			fmt.Printf("  • Create symlink: %s -> AGENTS.md\n", cfg.Path)
 		}
 
 		fmt.Println("\nRun without --dry-run to apply changes.")
@@ -127,7 +127,7 @@ func Run(opts Options) error {
 		if err := os.WriteFile("AGENTS.md", []byte(mergedContent), 0644); err != nil {
 			return fmt.Errorf("writing AGENTS.md: %w", err)
 		}
-		fmt.Println("✓ Created/updated AGENTS.md")
+		fmt.Println("[ok] Created/updated AGENTS.md")
 	}
 
 	// Create symlinks
@@ -135,10 +135,10 @@ func Run(opts Options) error {
 		if err := createSymlink(cfg.Path, opts); err != nil {
 			return fmt.Errorf("creating symlink for %s: %w", cfg.Path, err)
 		}
-		fmt.Printf("✓ Symlinked %s → AGENTS.md\n", cfg.Path)
+		fmt.Printf("[ok] Symlinked %s -> AGENTS.md\n", cfg.Path)
 	}
 
-	fmt.Println("\n🎉 Done!")
+	fmt.Println("\nDone!")
 	return nil
 }
 
@@ -230,7 +230,7 @@ func scanConfigs(opts Options) ([]AgentConfig, error) {
 				// Skip if it's a symlink pointing to AGENTS.md
 				if isSymlinkToAgentsMD(match) {
 					if opts.Verbose {
-						fmt.Printf("  ⤳ %s (symlink to AGENTS.md, skipping)\n", match)
+						fmt.Printf("  [skip] %s (symlink to AGENTS.md, skipping)\n", match)
 					}
 					continue
 				}
@@ -238,13 +238,13 @@ func scanConfigs(opts Options) ([]AgentConfig, error) {
 				content, err := os.ReadFile(match)
 				if err != nil {
 					if opts.Verbose {
-						fmt.Printf("  ✗ %s (error reading: %v)\n", match, err)
+						fmt.Printf("  [error] %s (error reading: %v)\n", match, err)
 					}
 					continue
 				}
 
 				if opts.Verbose {
-					fmt.Printf("  ✓ %s (%s)\n", match, agent.Name)
+					fmt.Printf("  [ok] %s (%s)\n", match, agent.Name)
 				}
 
 				configs = append(configs, AgentConfig{
@@ -293,7 +293,7 @@ func buildMergedContent(existing string, toMerge []AgentConfig, toSymlink []Agen
 		// Skip if content is already in existing
 		if existing != "" && strings.Contains(existing, strings.TrimSpace(cfg.Content)) {
 			if opts.Verbose {
-				fmt.Printf("  ⤳ %s content already in AGENTS.md, skipping\n", cfg.Path)
+				fmt.Printf("  [skip] %s content already in AGENTS.md, skipping\n", cfg.Path)
 			}
 			continue
 		}

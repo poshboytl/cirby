@@ -1,4 +1,4 @@
-# Cirby 🩷
+# Cirby
 
 Merge AI coding agent configs into the unified [AGENTS.md](https://agents.md) standard.
 
@@ -15,7 +15,7 @@ Different AI coding agents use different configuration files:
 | Windsurf | `.windsurfrules` |
 | GitHub Copilot | `.github/copilot-instructions.md` |
 | Codex | `CODEX.md` |
-| OpenCode, AMP | `AGENTS.md` ✓ |
+| OpenCode, AMP | `AGENTS.md` (standard) |
 
 This creates friction when your team uses different tools, and makes it hard to maintain consistent instructions across agents.
 
@@ -26,16 +26,16 @@ This creates friction when your team uses different tools, and makes it hard to 
 ```bash
 $ cirby
 Scanning for agent configuration files...
-  ✓ CLAUDE.md (Claude Code)
-  ✓ .cursorrules (Cursor)
-  ✓ .windsurfrules (Windsurf)
+  Found CLAUDE.md (Claude Code)
+  Found .cursorrules (Cursor)
+  Found .windsurfrules (Windsurf)
 
-✓ Created/updated AGENTS.md
-✓ Symlinked CLAUDE.md → AGENTS.md
-✓ Symlinked .cursorrules → AGENTS.md
-✓ Symlinked .windsurfrules → AGENTS.md
+Created/updated AGENTS.md
+Symlinked CLAUDE.md -> AGENTS.md
+Symlinked .cursorrules -> AGENTS.md
+Symlinked .windsurfrules -> AGENTS.md
 
-🎉 Done!
+Done!
 ```
 
 ## Installation
@@ -106,12 +106,12 @@ Running `cirby` multiple times is safe. It detects existing symlinks and unchang
 After running cirby:
 ```
 project/
-├── AGENTS.md           ← The source of truth
-├── CLAUDE.md           → symlink to AGENTS.md
-├── .cursorrules        → symlink to AGENTS.md
-├── .windsurfrules      → symlink to AGENTS.md
+├── AGENTS.md           <- The source of truth
+├── CLAUDE.md           -> symlink to AGENTS.md
+├── .cursorrules        -> symlink to AGENTS.md
+├── .windsurfrules      -> symlink to AGENTS.md
 └── .github/
-    └── copilot-instructions.md → symlink to ../AGENTS.md
+    └── copilot-instructions.md -> symlink to ../AGENTS.md
 ```
 
 ## Contributing
@@ -124,4 +124,4 @@ MIT
 
 ## Credits
 
-Named after [Kirby](https://en.wikipedia.org/wiki/Kirby_(character)), the Nintendo character who absorbs abilities from others. Cirby absorbs your agent configs and unifies them. 🩷
+Named after [Kirby](https://en.wikipedia.org/wiki/Kirby_(character)), the Nintendo character who absorbs abilities from others. Cirby absorbs your agent configs and unifies them.
