@@ -14,27 +14,28 @@ Different AI coding agents use different configuration files:
 | Cursor | `.cursorrules`, `.cursor/rules/*.mdc` |
 | Windsurf | `.windsurfrules` |
 | GitHub Copilot | `.github/copilot-instructions.md` |
-| Codex | `CODEX.md` |
 | Gemini CLI | `GEMINI.md` |
+| Codex | `CODEX.md` |
 | OpenCode, AMP | `AGENTS.md` (standard) |
 
-This creates friction when your team uses different tools, and makes it hard to maintain consistent instructions across agents.
+This creates friction when your team uses different tools.
 
 ## The Solution
 
-`cirby` scans your project, merges all agent configs into `AGENTS.md`, and creates symlinks so each tool still finds its expected file.
+`cirby` uses AI to intelligently merge your agent configs into a unified `AGENTS.md`, then creates symlinks so each tool still finds its expected file.
 
 ```bash
 $ cirby
-Scanning for agent configuration files...
-  Found CLAUDE.md (Claude Code)
-  Found .cursorrules (Cursor)
-  Found .windsurfrules (Windsurf)
 
-Created/updated AGENTS.md
-Symlinked CLAUDE.md -> AGENTS.md
-Symlinked .cursorrules -> AGENTS.md
-Symlinked .windsurfrules -> AGENTS.md
+Scanning for agent config files...
+  Found: CLAUDE.md, GEMINI.md, .cursorrules
+
+Using claude for merge...
+[ok] Created AGENTS.md
+
+[ok] Symlinked CLAUDE.md -> AGENTS.md
+[ok] Symlinked GEMINI.md -> AGENTS.md
+[ok] Symlinked .cursorrules -> AGENTS.md
 
 Done!
 ```
@@ -62,47 +63,29 @@ Check the [Releases](https://github.com/poshboytl/cirby/releases) page for pre-b
 ## Usage
 
 ```bash
-# Merge configs and create symlinks
-cirby
-
-# Preview changes without modifying files
-cirby --dry-run
-
-# Skip git uncommitted changes check
-cirby --force
-
-# Verbose output
-cirby --verbose
+cirby              # Auto-detect available agent
+cirby claude       # Use Claude Code for merge
+cirby gemini       # Use Gemini CLI for merge
+cirby --dry-run    # Preview what would be done
+cirby --force      # Skip git safety check
+cirby --verbose    # Detailed output
 ```
 
-## Safety Features
+## Requirements
 
-### Git Protection
+You need at least one of these coding agents installed:
+- [Claude Code](https://claude.ai/code) (`claude` CLI)
+- [Gemini CLI](https://ai.google.dev/gemini-cli) (`gemini` CLI)
+- [Codex](https://openai.com/codex) (`codex` CLI)
+- [Aider](https://aider.chat) (`aider` CLI)
 
-Cirby requires agent config files to be committed before merging. This ensures you can always rollback via git:
-
-```bash
-$ cirby
-Error: uncommitted changes detected in agent config files:
-  - CLAUDE.md (modified)
-  - .cursorrules (untracked)
-
-Please commit first so you can rollback if needed:
-  git add CLAUDE.md .cursorrules
-  git commit -m "backup before cirby"
-```
-
-Use `--force` to skip this check (not recommended).
-
-### Idempotency
-
-Running `cirby` multiple times is safe. It detects existing symlinks and unchanged content, only updating when necessary.
+Cirby will auto-detect which ones are available and use the first one found (or let you choose if multiple are installed).
 
 ## How It Works
 
-1. **Scan** — Find all agent config files in your project
-2. **Merge** — Combine content into `AGENTS.md` (with deduplication)
-3. **Symlink** — Replace original files with symlinks to `AGENTS.md`
+1. **Scan** - Find all agent config files in your project
+2. **Merge** - Use an AI agent to intelligently combine content (dedup, unify language)
+3. **Symlink** - Replace original files with symlinks to `AGENTS.md`
 
 After running cirby:
 ```
@@ -110,14 +93,22 @@ project/
 ├── AGENTS.md           <- The source of truth
 ├── CLAUDE.md           -> symlink to AGENTS.md
 ├── .cursorrules        -> symlink to AGENTS.md
-├── .windsurfrules      -> symlink to AGENTS.md
-└── .github/
-    └── copilot-instructions.md -> symlink to ../AGENTS.md
+└── GEMINI.md           -> symlink to AGENTS.md
 ```
+
+## Safety Features
+
+### Git Protection
+
+Cirby requires agent config files to be committed before modifying. This ensures you can always rollback via git.
+
+### If AGENTS.md Already Exists
+
+Cirby skips the merge step and only creates symlinks. Your existing `AGENTS.md` is preserved.
 
 ## Contributing
 
-Issues and PRs welcome! This project uses the AGENTS.md standard (of course).
+Issues and PRs welcome!
 
 ## License
 
@@ -125,4 +116,4 @@ MIT
 
 ## Credits
 
-Named after [Kirby](https://en.wikipedia.org/wiki/Kirby_(character)), the Nintendo character who absorbs abilities from others. Cirby absorbs your agent configs and unifies them.
+Named after [Kirby](https://en.wikipedia.org/wiki/Kirby_(character)), the Nintendo character who absorbs abilities from others.
