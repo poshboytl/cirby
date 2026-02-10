@@ -92,8 +92,10 @@ func Run(opts Options) error {
 
 	// Check if AGENTS.md already exists
 	agentsMDExists := false
-	if _, err := os.Stat("AGENTS.md"); err == nil {
+	var agentsMDContent string
+	if content, err := os.ReadFile("AGENTS.md"); err == nil {
 		agentsMDExists = true
+		agentsMDContent = string(content)
 	}
 
 	// Filter out files that are already symlinks to AGENTS.md
@@ -116,58 +118,58 @@ func Run(opts Options) error {
 		return nil
 	}
 
-	// If AGENTS.md doesn't exist, we need to create it via LLM merge
-	if !agentsMDExists {
-		// Detect or use specified agent
-		agent, err := selectAgent(opts)
-		if err != nil {
-			return err
-		}
-
-		if opts.DryRun {
-			fmt.Println("\n[Dry Run] Would perform these actions:\n")
-			fmt.Printf("  - Use %s to merge %d files into AGENTS.md\n", agent.Name, len(toProcess))
-			for _, cfg := range toProcess {
-				fmt.Printf("  - Create symlink: %s -> AGENTS.md\n", cfg.Path)
-			}
-			fmt.Println("\nRun without --dry-run to apply changes.")
-			return nil
-		}
-
-		// Build the merge prompt
-		prompt := buildMergePrompt(toProcess)
-
-		fmt.Printf("Merging with %s...\n", agent.Name)
-		if opts.Verbose {
-			fmt.Printf("Prompt:\n%s\n", prompt)
-		}
-
-		// Execute the agent
-		if err := executeAgent(agent, prompt, opts); err != nil {
-			return fmt.Errorf("agent merge failed: %w", err)
-		}
-
-		// Verify AGENTS.md was created
-		if _, err := os.Stat("AGENTS.md"); os.IsNotExist(err) {
-			return fmt.Errorf("agent did not create AGENTS.md")
-		}
-
-		fmt.Println("[ok] Created AGENTS.md")
-	} else {
-		if opts.Verbose {
-			fmt.Println("AGENTS.md already exists, skipping merge")
-		}
+	// If there are non-symlink files, we need to merge them (even if AGENTS.md exists)
+	// Detect or use specified agent
+	agent, err := selectAgent(opts)
+	if err != nil {
+		return err
 	}
 
-	// Create symlinks
 	if opts.DryRun {
-		fmt.Println("\n[Dry Run] Would create symlinks:")
-		for _, cfg := range toProcess {
-			fmt.Printf("  - %s -> AGENTS.md\n", cfg.Path)
+		fmt.Println("\n[Dry Run] Would perform these actions:\n")
+		if agentsMDExists {
+			fmt.Printf("  - Use %s to merge %d new files INTO existing AGENTS.md\n", agent.Name, len(toProcess))
+		} else {
+			fmt.Printf("  - Use %s to merge %d files into new AGENTS.md\n", agent.Name, len(toProcess))
 		}
+		for _, cfg := range toProcess {
+			fmt.Printf("  - Create symlink: %s -> AGENTS.md\n", cfg.Path)
+		}
+		fmt.Println("\nRun without --dry-run to apply changes.")
 		return nil
 	}
 
+	// Build the merge prompt
+	var prompt string
+	if agentsMDExists {
+		prompt = buildMergeIntoExistingPrompt(agentsMDContent, toProcess)
+		fmt.Printf("Merging %d new files into existing AGENTS.md with %s...\n", len(toProcess), agent.Name)
+	} else {
+		prompt = buildMergePrompt(toProcess)
+		fmt.Printf("Merging with %s...\n", agent.Name)
+	}
+
+	if opts.Verbose {
+		fmt.Printf("Prompt:\n%s\n", prompt)
+	}
+
+	// Execute the agent
+	if err := executeAgent(agent, prompt, opts); err != nil {
+		return fmt.Errorf("agent merge failed: %w", err)
+	}
+
+	// Verify AGENTS.md exists
+	if _, err := os.Stat("AGENTS.md"); os.IsNotExist(err) {
+		return fmt.Errorf("agent did not create/update AGENTS.md")
+	}
+
+	if agentsMDExists {
+		fmt.Println("[ok] Updated AGENTS.md")
+	} else {
+		fmt.Println("[ok] Created AGENTS.md")
+	}
+
+	// Create symlinks
 	for _, cfg := range toProcess {
 		if err := createSymlink(cfg.Path, opts); err != nil {
 			return fmt.Errorf("creating symlink for %s: %w", cfg.Path, err)
@@ -259,6 +261,35 @@ The AGENTS.md file should follow this structure:
 - Any other relevant sections
 
 Please create the AGENTS.md file now.`, strings.Join(files, "\n"))
+}
+
+func buildMergeIntoExistingPrompt(existingContent string, configs []AgentConfig) string {
+	var files []string
+	for _, cfg := range configs {
+		files = append(files, cfg.Path)
+	}
+
+	return fmt.Sprintf(`The project already has an AGENTS.md file with the following content:
+
+---
+%s
+---
+
+New agent configuration files have been found that need to be merged:
+%s
+
+Please:
+1. Read the new configuration files
+2. Analyze what information they contain that is NOT already in AGENTS.md
+3. Merge any new, unique information into AGENTS.md
+4. Remove any duplicates
+5. Use agent-agnostic language (don't say "Claude should..." or "Gemini should...")
+6. Keep the content well-organized
+7. Update the AGENTS.md file with the merged content
+
+Important: Preserve the existing structure and content of AGENTS.md, only ADD new information that wasn't there before.
+
+Please update the AGENTS.md file now.`, existingContent, strings.Join(files, "\n"))
 }
 
 func executeAgent(agent SupportedAgent, prompt string, opts Options) error {
