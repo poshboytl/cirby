@@ -6,7 +6,11 @@ Merge AI coding agent configs into the unified [AGENTS.md](https://agents.md) st
 
 ## The Problem
 
-Different AI coding agents use different configuration files:
+Different AI coding agents use different configuration files. This creates friction when your team uses different tools.
+
+## Supported Config Files
+
+Cirby can detect and merge these agent configuration files:
 
 | Agent | Config File |
 |-------|-------------|
@@ -16,9 +20,22 @@ Different AI coding agents use different configuration files:
 | GitHub Copilot | `.github/copilot-instructions.md` |
 | Gemini CLI | `GEMINI.md` |
 | Codex | `CODEX.md` |
-| OpenCode, AMP | `AGENTS.md` (standard) |
+| OpenCode, AMP | `AGENTS.md` (already standard) |
 
-This creates friction when your team uses different tools.
+## Supported Merge Agents
+
+Cirby uses your installed coding agent to intelligently merge configs:
+
+| Agent | CLI Command | Install |
+|-------|-------------|---------|
+| Claude Code | `claude` | [claude.ai/code](https://claude.ai/code) |
+| OpenCode | `opencode` | [opencode.ai](https://opencode.ai) |
+| Gemini CLI | `gemini` | [ai.google.dev](https://ai.google.dev/gemini-cli) |
+| Cursor CLI | `cursor-agent` | [cursor.com/cli](https://cursor.com/cli) |
+| Codex | `codex` | [openai.com/codex](https://openai.com/codex) |
+| Aider | `aider` | [aider.chat](https://aider.chat) |
+
+Cirby auto-detects which agents are installed. If multiple are available, you can choose or specify one.
 
 ## The Solution
 
@@ -70,18 +87,6 @@ cirby --dry-run    # Preview what would be done
 cirby --force      # Skip git safety check
 cirby --verbose    # Detailed output
 ```
-
-## Requirements
-
-You need at least one of these coding agents installed:
-- [Claude Code](https://claude.ai/code) (`claude` CLI)
-- [OpenCode](https://opencode.ai) (`opencode` CLI)
-- [Gemini CLI](https://ai.google.dev/gemini-cli) (`gemini` CLI)
-- [Cursor CLI](https://cursor.com/cli) (`cursor-agent` CLI)
-- [Codex](https://openai.com/codex) (`codex` CLI)
-- [Aider](https://aider.chat) (`aider` CLI)
-
-Cirby will auto-detect which ones are available and use the first one found (or let you choose if multiple are installed).
 
 ## How It Works
 
