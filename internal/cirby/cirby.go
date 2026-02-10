@@ -37,6 +37,7 @@ var agentPatterns = []struct {
 	{"Cursor (rules)", []string{".cursor/rules/*.mdc"}, "merge"},
 	{"Windsurf", []string{".windsurfrules"}, "symlink"},
 	{"GitHub Copilot", []string{".github/copilot-instructions.md"}, "symlink"},
+	{"Gemini CLI", []string{"GEMINI.md"}, "symlink"},
 	{"Codex", []string{"CODEX.md"}, "merge"},
 	{"OpenCode/AMP", []string{"AGENTS.md"}, "keep"},
 }
@@ -197,7 +198,7 @@ Or use --force to skip this check (not recommended)`,
 func isAgentConfigFile(path string) bool {
 	base := filepath.Base(path)
 	agentFiles := []string{
-		"CLAUDE.md", "AGENTS.md", "CODEX.md",
+		"CLAUDE.md", "AGENTS.md", "CODEX.md", "GEMINI.md",
 		".cursorrules", ".windsurfrules",
 		"copilot-instructions.md",
 	}

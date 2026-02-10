@@ -15,6 +15,7 @@ Different AI coding agents use different configuration files:
 | Windsurf | `.windsurfrules` |
 | GitHub Copilot | `.github/copilot-instructions.md` |
 | Codex | `CODEX.md` |
+| Gemini CLI | `GEMINI.md` |
 | OpenCode, AMP | `AGENTS.md` (standard) |
 
 This creates friction when your team uses different tools, and makes it hard to maintain consistent instructions across agents.

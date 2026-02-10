@@ -68,6 +68,7 @@ Supported agents:
   - Cursor (.cursorrules, .cursor/rules/*.mdc)
   - Windsurf (.windsurfrules)
   - GitHub Copilot (.github/copilot-instructions.md)
+  - Gemini CLI (GEMINI.md)
   - Codex (CODEX.md)
   - OpenCode, AMP (AGENTS.md - already standard)
 
