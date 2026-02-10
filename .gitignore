@@ -1,0 +1,12 @@
+# Binaries
+cirby
+cirby-*
+*.exe
+
+# Test directories
+test-*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
