@@ -54,9 +54,19 @@ var supportedAgents = []SupportedAgent{
 		Args:    func(prompt string) []string { return []string{"-p", prompt, "--allowedTools", "Edit,Write,Read"} },
 	},
 	{
+		Name:    "opencode",
+		Command: "opencode",
+		Args:    func(prompt string) []string { return []string{"-p", prompt} },
+	},
+	{
 		Name:    "gemini",
 		Command: "gemini",
 		Args:    func(prompt string) []string { return []string{"-p", prompt} },
+	},
+	{
+		Name:    "cursor",
+		Command: "cursor-agent",
+		Args:    func(prompt string) []string { return []string{"chat", prompt} },
 	},
 	{
 		Name:    "codex",
@@ -193,7 +203,7 @@ func selectAgent(opts Options) (SupportedAgent, error) {
 				return a, nil
 			}
 		}
-		return SupportedAgent{}, fmt.Errorf("unknown agent: %s (supported: claude, gemini, codex, aider)", opts.Agent)
+		return SupportedAgent{}, fmt.Errorf("unknown agent: %s (supported: claude, opencode, gemini, cursor, codex, aider)", opts.Agent)
 	}
 
 	// Auto-detect available agents
@@ -205,7 +215,7 @@ func selectAgent(opts Options) (SupportedAgent, error) {
 	}
 
 	if len(available) == 0 {
-		return SupportedAgent{}, fmt.Errorf("no supported agent found. Please install one of: claude, gemini, codex, aider")
+		return SupportedAgent{}, fmt.Errorf("no supported agent found. Please install one of: claude, opencode, gemini, cursor, codex, aider")
 	}
 
 	if len(available) == 1 {

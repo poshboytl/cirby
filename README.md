@@ -75,7 +75,9 @@ cirby --verbose    # Detailed output
 
 You need at least one of these coding agents installed:
 - [Claude Code](https://claude.ai/code) (`claude` CLI)
+- [OpenCode](https://opencode.ai) (`opencode` CLI)
 - [Gemini CLI](https://ai.google.dev/gemini-cli) (`gemini` CLI)
+- [Cursor CLI](https://cursor.com/cli) (`cursor-agent` CLI)
 - [Codex](https://openai.com/codex) (`codex` CLI)
 - [Aider](https://aider.chat) (`aider` CLI)
 

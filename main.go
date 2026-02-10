@@ -57,7 +57,8 @@ func printHelp() {
 Usage: cirby [agent] [options]
 
 Arguments:
-  agent              Agent to use for smart merge (claude, gemini, codex, aider)
+  agent              Agent to use for smart merge:
+                     claude, opencode, gemini, cursor, codex, aider
                      If not specified, auto-detects available agents
 
 Options:
