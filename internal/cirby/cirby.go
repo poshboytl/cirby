@@ -1,8 +1,7 @@
 package cirby
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
+	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,30 +15,59 @@ type Options struct {
 	DryRun  bool
 	Force   bool
 	Verbose bool
+	Agent   string
 }
 
 // AgentConfig represents a discovered agent configuration file
 type AgentConfig struct {
-	Path     string
-	Agent    string
-	Content  string
-	Strategy string // "merge", "symlink", "keep"
+	Path    string
+	Agent   string
+	Content string
+}
+
+// SupportedAgent represents a coding agent that can be used for merging
+type SupportedAgent struct {
+	Name    string
+	Command string
+	Args    func(prompt string) []string
 }
 
 // Agent patterns to scan for
 var agentPatterns = []struct {
 	Name     string
 	Patterns []string
-	Strategy string
 }{
-	{"Claude Code", []string{"CLAUDE.md", "**/CLAUDE.md"}, "symlink"},
-	{"Cursor (legacy)", []string{".cursorrules"}, "symlink"},
-	{"Cursor (rules)", []string{".cursor/rules/*.mdc"}, "merge"},
-	{"Windsurf", []string{".windsurfrules"}, "symlink"},
-	{"GitHub Copilot", []string{".github/copilot-instructions.md"}, "symlink"},
-	{"Gemini CLI", []string{"GEMINI.md"}, "symlink"},
-	{"Codex", []string{"CODEX.md"}, "merge"},
-	{"OpenCode/AMP", []string{"AGENTS.md"}, "keep"},
+	{"Claude Code", []string{"CLAUDE.md"}},
+	{"Cursor (legacy)", []string{".cursorrules"}},
+	{"Cursor (rules)", []string{".cursor/rules/*.mdc"}},
+	{"Windsurf", []string{".windsurfrules"}},
+	{"GitHub Copilot", []string{".github/copilot-instructions.md"}},
+	{"Gemini CLI", []string{"GEMINI.md"}},
+	{"Codex", []string{"CODEX.md"}},
+}
+
+// Supported agents for merging
+var supportedAgents = []SupportedAgent{
+	{
+		Name:    "claude",
+		Command: "claude",
+		Args:    func(prompt string) []string { return []string{"-p", prompt, "--allowedTools", "Edit,Write,Read"} },
+	},
+	{
+		Name:    "gemini",
+		Command: "gemini",
+		Args:    func(prompt string) []string { return []string{"-p", prompt} },
+	},
+	{
+		Name:    "codex",
+		Command: "codex",
+		Args:    func(prompt string) []string { return []string{prompt} },
+	},
+	{
+		Name:    "aider",
+		Command: "aider",
+		Args:    func(prompt string) []string { return []string{"--message", prompt, "--yes"} },
+	},
 }
 
 // Run executes the main cirby logic
@@ -63,76 +91,84 @@ func Run(opts Options) error {
 	}
 
 	// Check if AGENTS.md already exists
-	existingAgentsMD := ""
-	if content, err := os.ReadFile("AGENTS.md"); err == nil {
-		existingAgentsMD = string(content)
+	agentsMDExists := false
+	if _, err := os.Stat("AGENTS.md"); err == nil {
+		agentsMDExists = true
 	}
 
-	// Separate configs by strategy
-	var toMerge []AgentConfig
-	var toSymlink []AgentConfig
-
+	// Filter out files that are already symlinks to AGENTS.md
+	var toProcess []AgentConfig
 	for _, cfg := range configs {
-		switch cfg.Strategy {
-		case "merge":
-			toMerge = append(toMerge, cfg)
-		case "symlink":
-			// Only symlink if not already a symlink to AGENTS.md
-			if !isSymlinkToAgentsMD(cfg.Path) {
-				toSymlink = append(toSymlink, cfg)
-			}
-		case "keep":
-			// AGENTS.md itself, nothing to do
+		if isSymlinkToAgentsMD(cfg.Path) {
 			if opts.Verbose {
-				fmt.Printf("  [ok] %s (already standard)\n", cfg.Path)
+				fmt.Printf("  [skip] %s (already symlinked)\n", cfg.Path)
 			}
+			continue
 		}
+		if cfg.Path == "AGENTS.md" {
+			continue
+		}
+		toProcess = append(toProcess, cfg)
 	}
 
-	// Build merged content
-	mergedContent := buildMergedContent(existingAgentsMD, toMerge, toSymlink, opts)
-
-	// Check if anything changed
-	if existingAgentsMD != "" {
-		existingHash := hashContent(existingAgentsMD)
-		newHash := hashContent(mergedContent)
-		if existingHash == newHash && len(toSymlink) == 0 {
-			fmt.Println("[ok] Already in sync. Nothing to do.")
-			return nil
-		}
-	}
-
-	// Dry run - just show what would happen
-	if opts.DryRun {
-		fmt.Println("\n[Dry Run] Would perform these actions:\n")
-
-		if mergedContent != existingAgentsMD {
-			fmt.Println("  • Create/update AGENTS.md with merged content")
-			if opts.Verbose {
-				fmt.Println("\n--- AGENTS.md content preview ---")
-				fmt.Println(mergedContent)
-				fmt.Println("--- end preview ---")
-			}
-		}
-
-		for _, cfg := range toSymlink {
-			fmt.Printf("  • Create symlink: %s -> AGENTS.md\n", cfg.Path)
-		}
-
-		fmt.Println("\nRun without --dry-run to apply changes.")
+	if len(toProcess) == 0 {
+		fmt.Println("[ok] Already in sync. Nothing to do.")
 		return nil
 	}
 
-	// Write AGENTS.md
-	if mergedContent != existingAgentsMD {
-		if err := os.WriteFile("AGENTS.md", []byte(mergedContent), 0644); err != nil {
-			return fmt.Errorf("writing AGENTS.md: %w", err)
+	// If AGENTS.md doesn't exist, we need to create it via LLM merge
+	if !agentsMDExists {
+		// Detect or use specified agent
+		agent, err := selectAgent(opts)
+		if err != nil {
+			return err
 		}
-		fmt.Println("[ok] Created/updated AGENTS.md")
+
+		if opts.DryRun {
+			fmt.Println("\n[Dry Run] Would perform these actions:\n")
+			fmt.Printf("  - Use %s to merge %d files into AGENTS.md\n", agent.Name, len(toProcess))
+			for _, cfg := range toProcess {
+				fmt.Printf("  - Create symlink: %s -> AGENTS.md\n", cfg.Path)
+			}
+			fmt.Println("\nRun without --dry-run to apply changes.")
+			return nil
+		}
+
+		// Build the merge prompt
+		prompt := buildMergePrompt(toProcess)
+
+		fmt.Printf("Merging with %s...\n", agent.Name)
+		if opts.Verbose {
+			fmt.Printf("Prompt:\n%s\n", prompt)
+		}
+
+		// Execute the agent
+		if err := executeAgent(agent, prompt, opts); err != nil {
+			return fmt.Errorf("agent merge failed: %w", err)
+		}
+
+		// Verify AGENTS.md was created
+		if _, err := os.Stat("AGENTS.md"); os.IsNotExist(err) {
+			return fmt.Errorf("agent did not create AGENTS.md")
+		}
+
+		fmt.Println("[ok] Created AGENTS.md")
+	} else {
+		if opts.Verbose {
+			fmt.Println("AGENTS.md already exists, skipping merge")
+		}
 	}
 
 	// Create symlinks
-	for _, cfg := range toSymlink {
+	if opts.DryRun {
+		fmt.Println("\n[Dry Run] Would create symlinks:")
+		for _, cfg := range toProcess {
+			fmt.Printf("  - %s -> AGENTS.md\n", cfg.Path)
+		}
+		return nil
+	}
+
+	for _, cfg := range toProcess {
 		if err := createSymlink(cfg.Path, opts); err != nil {
 			return fmt.Errorf("creating symlink for %s: %w", cfg.Path, err)
 		}
@@ -143,11 +179,106 @@ func Run(opts Options) error {
 	return nil
 }
 
+func selectAgent(opts Options) (SupportedAgent, error) {
+	// If agent specified, find it
+	if opts.Agent != "" {
+		for _, a := range supportedAgents {
+			if a.Name == opts.Agent {
+				// Check if it's installed
+				if _, err := exec.LookPath(a.Command); err != nil {
+					return SupportedAgent{}, fmt.Errorf("%s is not installed or not in PATH", a.Name)
+				}
+				return a, nil
+			}
+		}
+		return SupportedAgent{}, fmt.Errorf("unknown agent: %s (supported: claude, gemini, codex, aider)", opts.Agent)
+	}
+
+	// Auto-detect available agents
+	var available []SupportedAgent
+	for _, a := range supportedAgents {
+		if _, err := exec.LookPath(a.Command); err == nil {
+			available = append(available, a)
+		}
+	}
+
+	if len(available) == 0 {
+		return SupportedAgent{}, fmt.Errorf("no supported agent found. Please install one of: claude, gemini, codex, aider")
+	}
+
+	if len(available) == 1 {
+		fmt.Printf("Using %s for merge\n", available[0].Name)
+		return available[0], nil
+	}
+
+	// Multiple agents available, let user choose
+	fmt.Println("Multiple agents available:")
+	for i, a := range available {
+		fmt.Printf("  %d) %s\n", i+1, a.Name)
+	}
+	fmt.Printf("Select agent [1]: ")
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	if input == "" {
+		return available[0], nil
+	}
+
+	var choice int
+	if _, err := fmt.Sscanf(input, "%d", &choice); err != nil || choice < 1 || choice > len(available) {
+		return available[0], nil
+	}
+
+	return available[choice-1], nil
+}
+
+func buildMergePrompt(configs []AgentConfig) string {
+	var files []string
+	for _, cfg := range configs {
+		files = append(files, cfg.Path)
+	}
+
+	return fmt.Sprintf(`Read the following AI agent configuration files in this project:
+%s
+
+These files contain instructions for different AI coding agents. Please:
+1. Analyze the content of each file
+2. Create a unified AGENTS.md file that combines the best instructions from all files
+3. Remove duplicate information
+4. Use agent-agnostic language (don't say "Claude should..." or "Gemini should...")
+5. Keep the merged content concise and well-organized
+6. Write the result to AGENTS.md in the current directory
+
+The AGENTS.md file should follow this structure:
+- Project Overview
+- Build & Test Commands
+- Code Style Guidelines
+- Architecture Notes
+- Any other relevant sections
+
+Please create the AGENTS.md file now.`, strings.Join(files, "\n"))
+}
+
+func executeAgent(agent SupportedAgent, prompt string, opts Options) error {
+	args := agent.Args(prompt)
+	cmd := exec.Command(agent.Command, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	if opts.Verbose {
+		fmt.Printf("Running: %s %s\n", agent.Command, strings.Join(args, " "))
+	}
+
+	return cmd.Run()
+}
+
 func checkGitStatus(opts Options) error {
 	// Check if we're in a git repo
 	cmd := exec.Command("git", "rev-parse", "--git-dir")
 	if err := cmd.Run(); err != nil {
-		// Not a git repo, skip check
 		if opts.Verbose {
 			fmt.Println("Not a git repository, skipping git check.")
 		}
@@ -187,7 +318,7 @@ Please commit first so you can rollback if needed:
   git add %s
   git commit -m "backup before cirby"
 
-Or use --force to skip this check (not recommended)`,
+Or use --force to skip this check`,
 			"  - "+strings.Join(uncommitted, "\n  - "),
 			strings.Join(uncommitted, " "))
 	}
@@ -228,14 +359,6 @@ func scanConfigs(opts Options) ([]AgentConfig, error) {
 			}
 
 			for _, match := range matches {
-				// Skip if it's a symlink pointing to AGENTS.md
-				if isSymlinkToAgentsMD(match) {
-					if opts.Verbose {
-						fmt.Printf("  [skip] %s (symlink to AGENTS.md, skipping)\n", match)
-					}
-					continue
-				}
-
 				content, err := os.ReadFile(match)
 				if err != nil {
 					if opts.Verbose {
@@ -249,13 +372,23 @@ func scanConfigs(opts Options) ([]AgentConfig, error) {
 				}
 
 				configs = append(configs, AgentConfig{
-					Path:     match,
-					Agent:    agent.Name,
-					Content:  string(content),
-					Strategy: agent.Strategy,
+					Path:    match,
+					Agent:   agent.Name,
+					Content: string(content),
 				})
 			}
 		}
+	}
+
+	// Also check for AGENTS.md
+	if _, err := os.Stat("AGENTS.md"); err == nil {
+		if opts.Verbose {
+			fmt.Println("  [ok] AGENTS.md (standard)")
+		}
+		configs = append(configs, AgentConfig{
+			Path:  "AGENTS.md",
+			Agent: "AGENTS.md",
+		})
 	}
 
 	// Sort for consistent output
@@ -281,69 +414,8 @@ func isSymlinkToAgentsMD(path string) bool {
 	return target == "AGENTS.md" || filepath.Base(target) == "AGENTS.md"
 }
 
-func buildMergedContent(existing string, toMerge []AgentConfig, toSymlink []AgentConfig, opts Options) string {
-	var parts []string
-
-	// If AGENTS.md already exists, use it as base
-	if existing != "" {
-		parts = append(parts, strings.TrimSpace(existing))
-	}
-
-	// Add content from files to merge (like .cursor/rules/*.mdc, CODEX.md)
-	for _, cfg := range toMerge {
-		// Skip if content is already in existing
-		if existing != "" && strings.Contains(existing, strings.TrimSpace(cfg.Content)) {
-			if opts.Verbose {
-				fmt.Printf("  [skip] %s content already in AGENTS.md, skipping\n", cfg.Path)
-			}
-			continue
-		}
-
-		header := fmt.Sprintf("\n\n---\n\n<!-- Merged from %s (%s) -->\n\n", cfg.Path, cfg.Agent)
-		parts = append(parts, header+strings.TrimSpace(cfg.Content))
-	}
-
-	// For symlink files, extract their content into AGENTS.md first (if no existing AGENTS.md)
-	if existing == "" && len(toSymlink) > 0 {
-		// Use the first file as the base
-		base := toSymlink[0]
-		parts = append(parts, fmt.Sprintf("# AGENTS.md\n\n%s", strings.TrimSpace(base.Content)))
-
-		// Merge others
-		for _, cfg := range toSymlink[1:] {
-			if strings.TrimSpace(cfg.Content) == strings.TrimSpace(base.Content) {
-				continue // Same content, skip
-			}
-			header := fmt.Sprintf("\n\n---\n\n<!-- Merged from %s (%s) -->\n\n", cfg.Path, cfg.Agent)
-			parts = append(parts, header+strings.TrimSpace(cfg.Content))
-		}
-	}
-
-	// If still empty, create a minimal AGENTS.md
-	if len(parts) == 0 {
-		return `# AGENTS.md
-
-This file provides guidance to AI coding agents working with this project.
-
-## Project Overview
-
-<!-- Add your project description here -->
-
-## Build & Test
-
-<!-- Add build and test commands here -->
-
-## Code Style
-
-<!-- Add code style guidelines here -->
-`
-	}
-
-	return strings.TrimSpace(strings.Join(parts, "")) + "\n"
-}
-
 func createSymlink(path string, opts Options) error {
-	// Remove existing file (we've already checked git status)
+	// Remove existing file
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing existing file: %w", err)
 	}
@@ -354,7 +426,6 @@ func createSymlink(path string, opts Options) error {
 	if dir == "." {
 		target = "AGENTS.md"
 	} else {
-		// For nested files like .github/copilot-instructions.md
 		relPath, err := filepath.Rel(dir, "AGENTS.md")
 		if err != nil {
 			target = "AGENTS.md"
@@ -364,9 +435,4 @@ func createSymlink(path string, opts Options) error {
 	}
 
 	return os.Symlink(target, path)
-}
-
-func hashContent(content string) string {
-	h := sha256.Sum256([]byte(content))
-	return hex.EncodeToString(h[:])
 }

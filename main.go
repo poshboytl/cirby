@@ -7,16 +7,17 @@ import (
 	"github.com/poshboytl/cirby/internal/cirby"
 )
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 func main() {
 	args := os.Args[1:]
 
-	// Parse flags
+	// Parse flags and agent
 	opts := cirby.Options{
 		DryRun:  false,
 		Force:   false,
 		Verbose: false,
+		Agent:   "",
 	}
 
 	for _, arg := range args {
@@ -34,9 +35,13 @@ func main() {
 			printHelp()
 			os.Exit(0)
 		default:
-			fmt.Fprintf(os.Stderr, "Unknown option: %s\n", arg)
-			printHelp()
-			os.Exit(1)
+			if arg[0] == '-' {
+				fmt.Fprintf(os.Stderr, "Unknown option: %s\n", arg)
+				printHelp()
+				os.Exit(1)
+			}
+			// Positional argument = agent name
+			opts.Agent = arg
 		}
 	}
 
@@ -49,28 +54,29 @@ func main() {
 func printHelp() {
 	fmt.Println(`cirby - Merge AI coding agent configs into AGENTS.md
 
-Usage: cirby [options]
+Usage: cirby [agent] [options]
+
+Arguments:
+  agent              Agent to use for smart merge (claude, gemini, codex, aider)
+                     If not specified, auto-detects available agents
 
 Options:
-  --dry-run, -n    Preview changes without modifying files
-  --force, -f      Skip git uncommitted changes check
-  --verbose, -v    Show detailed output
-  --version        Show version
-  --help, -h       Show this help
+  --dry-run, -n      Preview changes without modifying files
+  --force, -f        Skip git uncommitted changes check
+  --verbose, -v      Show detailed output
+  --version          Show version
+  --help, -h         Show this help
 
 Examples:
-  cirby              # Merge configs and create symlinks
+  cirby              # Auto-detect agent for merge
+  cirby claude       # Use Claude Code for merge
+  cirby gemini       # Use Gemini CLI for merge
   cirby --dry-run    # Preview what would be done
-  cirby --force      # Skip git safety check
 
-Supported agents:
-  - Claude Code (CLAUDE.md)
-  - Cursor (.cursorrules, .cursor/rules/*.mdc)
-  - Windsurf (.windsurfrules)
-  - GitHub Copilot (.github/copilot-instructions.md)
-  - Gemini CLI (GEMINI.md)
-  - Codex (CODEX.md)
-  - OpenCode, AMP (AGENTS.md - already standard)
+How it works:
+  1. Scans for agent config files (CLAUDE.md, GEMINI.md, .cursorrules, etc.)
+  2. Uses an AI agent to intelligently merge content into AGENTS.md
+  3. Creates symlinks so each tool finds its expected file
 
 Learn more: https://github.com/poshboytl/cirby`)
 }
