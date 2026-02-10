@@ -43,20 +43,20 @@ Scanning for agent configuration files...
 ### Go Install
 
 ```bash
-go install github.com/BlackKingBarOrg/cirby@latest
+go install github.com/poshboytl/cirby@latest
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/BlackKingBarOrg/cirby.git
+git clone https://github.com/poshboytl/cirby.git
 cd cirby
 go build -o cirby .
 ```
 
 ### Download Binary
 
-Check the [Releases](https://github.com/BlackKingBarOrg/cirby/releases) page for pre-built binaries.
+Check the [Releases](https://github.com/poshboytl/cirby/releases) page for pre-built binaries.
 
 ## Usage
 

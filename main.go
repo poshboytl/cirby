@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/BlackKingBarOrg/cirby/internal/cirby"
+	"github.com/poshboytl/cirby/internal/cirby"
 )
 
 const version = "0.1.0"
@@ -71,5 +71,5 @@ Supported agents:
   - Codex (CODEX.md)
   - OpenCode, AMP (AGENTS.md - already standard)
 
-Learn more: https://github.com/BlackKingBarOrg/cirby`)
+Learn more: https://github.com/poshboytl/cirby`)
 }
