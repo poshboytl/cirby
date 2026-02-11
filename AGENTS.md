@@ -5,21 +5,33 @@ Guidance for agentic coding assistants working in `cirby`.
 ## Project Snapshot
 - Language: Go (`go.mod` declares Go `1.25.7`)
 - Binary: `cirby`
-- Goal: unify AI agent config files into `AGENTS.md`
+- Goal: unify AI agent config files into `AGENTS.md`, reducing friction in teams using multiple AI tools by maintaining a single source of truth for agent instructions
 - Dependency policy: Go standard library only
+- Supported agents: Claude, Cursor, Windsurf, Copilot, Gemini, Codex
+- Integration: shells out to available AI CLIs (e.g., `claude`, `gemini`, `aider`) to perform intelligent merges
+- Core logic lives in `internal/` to prevent external usage as a library
 
 ## Repository Layout
 ```text
 cirby/
 ├── main.go                 # CLI entrypoint + flags + exit codes
 ├── internal/cirby/cirby.go # scan, merge, safety checks, symlinks
+├── go.mod                  # module definition + Go version
 ├── README.md               # user-facing docs
-└── AGENTS.md               # agent guidance
+└── AGENTS.md               # agent guidance (generated/maintained by the tool)
 ```
+
+### Key Functions in `internal/cirby/cirby.go`
+- `Run()` — orchestrates the full flow: scan → git safety check → filter symlinks → select agent → build prompt → execute agent → create symlinks
+- `scanConfigs()` — discovers config files via glob patterns defined in `agentPatterns`
+- `selectAgent()` — auto-detects or validates CLI-specified merge agent from `supportedAgents`
+- `executeAgent()` — shells out to the selected agent's CLI
+- `buildMergePrompt()` / `buildMergeIntoExistingPrompt()` — construct LLM prompts for merging
+- `createSymlink()` — replaces original config files with relative symlinks to AGENTS.md
 
 ## Core Behavior to Preserve
 1. Idempotent runs: repeated execution should not create extra changes.
-2. Git safety by default: block edits when agent config files are uncommitted.
+2. Git safety by default: block edits when agent config files are uncommitted (bypass with `--force`).
 3. Strategy handling: keep `keep`, merge `merge`, and symlink `symlink` behavior intact.
 4. Deterministic output: preserve sorted ordering and stable content comparisons.
 5. Dry-run is side-effect free.
@@ -155,6 +167,11 @@ Strategies:
 - `keep`: treat file as already standardized and do nothing
 
 Also update user-facing docs (`README.md` and help text in `main.go`).
+
+## Merging Guidelines
+- When merging configurations, prioritize agent-agnostic language (avoid agent-specific phrasing).
+- Remove duplicates across source files.
+- Detect if a file is already a symlink to `AGENTS.md` to avoid redundant work.
 
 ## Cursor and Copilot Rule Files
 Current repository scan:
