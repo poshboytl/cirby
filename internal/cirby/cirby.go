@@ -219,16 +219,17 @@ func selectAgent(opts Options) (SupportedAgent, error) {
 	}
 
 	if len(available) == 1 {
-		fmt.Printf("Using %s for merge\n", available[0].Name)
+		fmt.Printf("Using %s to merge config files...\n", available[0].Name)
 		return available[0], nil
 	}
 
 	// Multiple agents available, let user choose
-	fmt.Println("Multiple agents available:")
+	fmt.Println("Cirby needs an AI agent to intelligently merge your config files.")
+	fmt.Println("Multiple agents detected on your system:\n")
 	for i, a := range available {
 		fmt.Printf("  %d) %s\n", i+1, a.Name)
 	}
-	fmt.Printf("Select agent [1]: ")
+	fmt.Printf("\nWhich agent would you like to use? [1]: ")
 
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
